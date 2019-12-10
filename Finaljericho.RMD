@@ -1,0 +1,92 @@
+---
+title: "FinalJericho"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require("knitr")
+r <- getOption("repos")
+r["CRAN"] <- "https://cran.cnr.berkeley.edu/"
+options(repos = r)
+```
+
+## OLS Model using queen's method
+
+```{r}
+library(rgdal)
+library(rgeos)
+library(spdep)
+library(sf)
+library(dplyr)
+library(leaflet)
+library(tmap)
+library(tmaptools)
+library(ggplot2)
+library(spatialreg)
+spat.data=readOGR(dsn=".", layer = "states_CopyFeatures1" )
+spat=data.frame(spat.data)
+library(foreign)
+write.csv(spat,file="states_CopyFeatures1.csv")
+names(spat.data)
+library(raster)
+summary(spat.data)
+# States_NO_ is the NO_FARM12
+spplot(spat.data, "states_NO_")
+queen.nb=poly2nb(spat.data)
+rook.nb=poly2nb(spat.data,queen = FALSE)
+queen.listw=nb2listw(queen.nb)
+rook.listw=nb2listw(rook.nb)
+listw1=queen.listw
+# Corresponding to SUM AREA=+NO_FARM12+AVE_SIZE1+AVE_SALE12
+reg.eq1=table2_c_3~states_NO_+states__13+states__14
+options(scipen = 7)
+# OLS Model
+reg1=lm(reg.eq1, data=spat.data)
+summary(reg1)
+```
+
+## Moran Test and other spatial anaylsis test
+
+```{r}
+lm.morantest(reg1,listw1)
+lm.LMtests(reg1, listw1, test=c("LMerr","LMlag","RLMerr","RLMlag","SARMA")) 
+```
+
+## SLX model
+
+```{r}
+# SLX spatially lagged model 
+reg2=lmSLX(reg.eq1, data=spat.data, listw1)
+summary(reg2)
+impacts(reg2,listw=listw1)
+summary(impacts(reg2,listw=listw1,R=500), zstats=TRUE)
+```
+
+## Likelihood test 
+
+```{r}
+# Likelihood ratio Tests: Test Model Restrictions
+LR.sarlm(reg1,reg2) 
+plot(reg1)
+```
+
+## map for the most correlated variable NO_FARM12
+
+```{r}
+
+options(scipen = 999)
+mydata1<- readr::read_csv("C:/testing2/finalcode2/states_CopyFeatures1.csv")
+mymap1<- st_read("C:/testing2/finalcode2/states_CopyFeatures1.shp")
+names(mydata1)
+names(mymap1)
+str(mymap1)
+map_and_data<- inner_join(mymap1,mydata1)
+
+str(mymap1)
+tm_shape(mymap1)+
+  tm_polygons("states_NO_", id="NAME", palette="Greens", main="NO_FARM12")
+tmap_mode("view")
+tmap_last()
+```
+
